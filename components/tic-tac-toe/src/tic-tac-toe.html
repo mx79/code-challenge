@@ -1,0 +1,384 @@
+<style>
+  .widget-container {
+    background: #f9f9f9;
+    padding: 20px;
+    border-radius: 16px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    text-align: center;
+    max-width: 320px;
+    width: 100%;
+    margin: 0 auto;
+    transition: transform 0.3s ease-in-out;
+  }
+
+  .widget-container:hover {
+    transform: translateY(-10px);
+  }
+
+  .cloudflare-logo {
+    display: block;
+    margin: 0 auto;
+    width: 80px;
+    height: auto;
+    margin-bottom: 20px;
+  }
+
+  .widget-header {
+    font-size: 2em;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 20px;
+    letter-spacing: 1px;
+  }
+
+  .tic-tac-toe-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-gap: 10px;
+    margin-top: 20px;
+  }
+
+  .tic-tac-toe-cell {
+    background-color: #ffffff;
+    border-radius: 8px;
+    border: 2px solid #eee;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2em;
+    cursor: pointer;
+    transition:
+      background-color 0.3s ease,
+      transform 0.3s ease;
+    width: 100px;
+    height: 100px;
+  }
+
+  .tic-tac-toe-cell:hover {
+    background-color: #f0f0f0;
+    transform: scale(1.05);
+  }
+
+  .tic-tac-toe-cell img {
+    width: 60px;
+    height: 60px;
+  }
+
+  .player-selection {
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+  }
+
+  .player-selection button {
+    padding: 12px 20px;
+    font-size: 1.2em;
+    border-radius: 8px;
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    transition:
+      background-color 0.3s ease,
+      box-shadow 0.3s ease;
+  }
+
+  #select-cross {
+    background-color: #007bff;
+  }
+
+  #select-cross:hover {
+    background-color: #0056b3;
+    box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
+  }
+
+  #select-round {
+    background-color: #ed7043;
+  }
+
+  #select-round:hover {
+    background-color: #d05c37;
+    box-shadow: 0 4px 12px rgba(237, 112, 67, 0.3);
+  }
+
+  #player-turn {
+    margin-top: 15px;
+    font-size: 1.3em;
+    font-weight: bold;
+    color: #333;
+    transition: color 0.3s ease;
+  }
+
+  #player-turn.cross {
+    color: #007bff;
+  }
+
+  #player-turn.round {
+    color: #ed7043;
+  }
+
+  #tic-tac-toe-reset-button {
+    margin-top: 20px;
+    padding: 12px 20px;
+    font-size: 1.2em;
+    border-radius: 8px;
+    background-color: #ed7043;
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    transition:
+      background-color 0.3s ease,
+      box-shadow 0.3s ease;
+  }
+
+  #tic-tac-toe-reset-button:hover {
+    background-color: #d05c37;
+    box-shadow: 0 4px 12px rgba(237, 112, 67, 0.3);
+  }
+</style>
+
+<div id="tic-tac-toe-widget" class="widget-container">
+  <img
+    src="/webcm/tic-tac-toe/cloudflare"
+    alt="Cloudflare Logo"
+    class="cloudflare-logo"
+  />
+  <div class="widget-header">Tic-Tac-Toe</div>
+  <div id="tic-tac-toe-controls" class="player-selection">
+    <button id="select-cross">Play as X</button>
+    <button id="select-round">Play as O</button>
+  </div>
+  <div id="tic-tac-toe-grid" class="tic-tac-toe-grid"></div>
+  <div id="player-turn"></div>
+  <div id="tic-tac-toe-reset" class="tic-tac-toe-controls">
+    <button id="tic-tac-toe-reset-button">Reset</button>
+  </div>
+</div>
+
+<script>
+  let currentPlayer = localStorage.getItem("currentPlayer");
+  let gameState = [
+    [null, null, null],
+    [null, null, null],
+    [null, null, null],
+  ];
+
+  function getRandomStartingPlayer() {
+    return Math.random() < 0.5 ? "cross" : "round";
+  }
+
+  function updateTurnIndicator(nextPlayer) {
+    const turnElement = document.getElementById("player-turn");
+    turnElement.innerText = `${nextPlayer} player is thinking hard...`;
+    turnElement.classList.remove("cross", "round");
+    turnElement.classList.add(nextPlayer);
+  }
+
+  async function generateTicTacToeGrid() {
+    const gridContainer = document.getElementById("tic-tac-toe-grid");
+    gridContainer.innerHTML = "";
+
+    const res = await webcm.track("ping");
+    if (res && res["tic-tac-toe"]) {
+      console.log("Tic-Tac-Toe board received from server:");
+      gameState = JSON.parse(res["tic-tac-toe"]);
+      document.getElementById("tic-tac-toe-controls").style.display = "none";
+      updateTurnIndicator(currentPlayer === "cross" ? "cross" : "round");
+    } else {
+      document.getElementById("tic-tac-toe-controls").style.display = "block";
+    }
+
+    gameState.forEach((row, rowIndex) => {
+      const rowElement = document.createElement("div");
+      rowElement.classList.add("tic-tac-toe-row");
+
+      row.forEach((cell, colIndex) => {
+        const cellElement = document.createElement("div");
+        cellElement.classList.add("tic-tac-toe-cell");
+        cellElement.setAttribute("data-row", rowIndex);
+        cellElement.setAttribute("data-col", colIndex);
+
+        if (cell === "cross") {
+          const img = document.createElement("img");
+          img.src = "/webcm/tic-tac-toe/cross";
+          cellElement.appendChild(img);
+        } else if (cell === "round") {
+          const img = document.createElement("img");
+          img.src = "/webcm/tic-tac-toe/round";
+          cellElement.appendChild(img);
+        }
+
+        cellElement.addEventListener("click", () =>
+          handleCellClick(rowIndex, colIndex),
+        );
+        rowElement.appendChild(cellElement);
+      });
+
+      gridContainer.appendChild(rowElement);
+    });
+  }
+
+  function updateCell(row, col, player) {
+    const cell = document.querySelector(
+      `.tic-tac-toe-cell[data-row="${row}"][data-col="${col}"]`,
+    );
+    const img = document.createElement("img");
+    img.src =
+      player === "cross"
+        ? "/webcm/tic-tac-toe/cross"
+        : "/webcm/tic-tac-toe/round";
+    cell.appendChild(img);
+  }
+
+  async function handleCellClick(row, col) {
+    if (gameState[row][col] !== null) {
+      return;
+    }
+
+    if (!currentPlayer) {
+      alert(`Error: No player selected`);
+      return;
+    }
+
+    gameState[row][col] = currentPlayer;
+    updateCell(row, col, currentPlayer);
+    updateTurnIndicator(currentPlayer === "cross" ? "round" : "cross");
+
+    const res = await webcm.track("event", {
+      row: row,
+      col: col,
+      player: currentPlayer,
+    });
+
+    const result = JSON.parse(res["tic-tac-toe"]);
+    console.log(result);
+
+    if (result.error) {
+      alert(`Erreur : ${result.error}`);
+      return;
+    }
+
+    const nextMove = result.nextMove;
+    if (nextMove) {
+      const [nextRow, nextCol] = nextMove;
+      gameState[nextRow][nextCol] =
+        currentPlayer === "cross" ? "round" : "cross";
+      updateCell(nextRow, nextCol, gameState[nextRow][nextCol]);
+      updateTurnIndicator(currentPlayer === "cross" ? "cross" : "round");
+    }
+
+    if (result.winner) {
+      webcm.track("reset").then(() => {
+        currentPlayer = null;
+        localStorage.removeItem("currentPlayer");
+        if (result.winner === "cross" || result.winner === "round") {
+          alert(`Player ${result.winner} has won!`);
+        } else {
+          alert(`Draw!`);
+        }
+      });
+    }
+  }
+
+  function resetGame() {
+    webcm.track("reset").then(() => {
+      currentPlayer = null;
+      localStorage.removeItem("currentPlayer");
+      gameState = [
+        [null, null, null],
+        [null, null, null],
+        [null, null, null],
+      ];
+      document.getElementById("tic-tac-toe-controls").style.display = "block";
+      generateTicTacToeGrid();
+    });
+  }
+
+  function getRandomEmptyCell() {
+    const emptyCells = [];
+    gameState.forEach((row, rowIndex) => {
+      row.forEach((cell, colIndex) => {
+        if (cell === null) emptyCells.push([rowIndex, colIndex]);
+      });
+    });
+    if (emptyCells.length > 0) {
+      return emptyCells[Math.floor(Math.random() * emptyCells.length)];
+    }
+    return null;
+  }
+
+  document.getElementById("select-cross").addEventListener("click", () => {
+    localStorage.setItem("currentPlayer", "cross");
+    currentPlayer = "cross";
+    document.getElementById("tic-tac-toe-controls").style.display = "none";
+
+    const startingPlayer = getRandomStartingPlayer();
+    if (startingPlayer === "round") {
+      const nextMove = getRandomEmptyCell();
+      if (nextMove) {
+        const [nextRow, nextCol] = nextMove;
+        gameState[nextRow][nextCol] = "round";
+        updateCell(nextRow, nextCol, "round");
+        webcm.track("adversary-started", {
+          row: nextRow,
+          col: nextCol,
+          player: "round",
+        });
+      }
+      updateTurnIndicator("cross");
+    } else {
+      updateTurnIndicator("cross");
+    }
+  });
+
+  document.getElementById("select-round").addEventListener("click", () => {
+    localStorage.setItem("currentPlayer", "round");
+    currentPlayer = "round";
+    document.getElementById("tic-tac-toe-controls").style.display = "none";
+
+    const startingPlayer = getRandomStartingPlayer();
+    if (startingPlayer === "cross") {
+      const nextMove = getRandomEmptyCell();
+      if (nextMove) {
+        const [nextRow, nextCol] = nextMove;
+        gameState[nextRow][nextCol] = "cross";
+        updateCell(nextRow, nextCol, "cross");
+        webcm.track("adversary-started", {
+          row: nextRow,
+          col: nextCol,
+          player: "cross",
+        });
+      }
+      updateTurnIndicator("round");
+    } else {
+      updateTurnIndicator("round");
+    }
+    /*
+    const startingPlayer = getRandomStartingPlayer();
+    if (startingPlayer === "cross") {
+      updateTurnIndicator("cross");
+    } else {
+      const nextMove = getRandomEmptyCell();
+      if (nextMove) {
+        const [nextRow, nextCol] = nextMove;
+        gameState[nextRow][nextCol] = "cross";
+        updateCell(nextRow, nextCol, "cross");
+        webcm.track("adversary-started", {
+          row: nextRow,
+          col: nextCol,
+          player: "cross",
+        });
+      }
+      updateTurnIndicator("cross");
+    }
+    */
+  });
+
+  document
+    .getElementById("tic-tac-toe-reset-button")
+    .addEventListener("click", resetGame);
+
+  document.addEventListener("DOMContentLoaded", () => {
+    generateTicTacToeGrid();
+  });
+</script>
